@@ -1,0 +1,5 @@
+{
+  "name": "Vambazar Elite",
+  "description": "Uma plataforma de serviços sob demanda de próxima geração para viagens, entregas e serviços profissionais, impulsionada por IA.",
+  "requestFramePermissions": ["geolocation"]
+}

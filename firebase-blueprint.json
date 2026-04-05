@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a client or driver in the system.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "driver"] },
+        "phone": { "type": "string" },
+        "location": { "type": "string", "description": "Current or preferred location" },
+        "vehicle": {
+          "type": "object",
+          "properties": {
+            "model": { "type": "string" },
+            "plate": { "type": "string" },
+            "type": { "type": "string", "enum": ["economy", "premium", "luxury", "van"] }
+          }
+        },
+        "isOnline": { "type": "boolean" },
+        "rating": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "Ride": {
+      "title": "Ride",
+      "description": "Represents a ride-hailing request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "completed", "cancelled"] },
+        "fare": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "origin", "destination", "status", "createdAt"]
+    },
+    "Delivery": {
+      "title": "Delivery",
+      "description": "Represents a delivery request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "completed", "cancelled"] },
+        "packageType": { "type": "string", "enum": ["small", "medium", "large", "fragile"] },
+        "receiverName": { "type": "string" },
+        "receiverPhone": { "type": "string" },
+        "cost": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "origin", "destination", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles for clients and drivers."
+    },
+    "/rides/{rideId}": {
+      "schema": "Ride",
+      "description": "Ride requests and history."
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": "Delivery",
+      "description": "Delivery requests and history."
+    }
+  }
+}

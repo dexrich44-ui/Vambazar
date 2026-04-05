@@ -1,0 +1,149 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId} (Firebase Auth UID)
+// Fields:
+//   - uid: string (required)
+//   - email: string (required, email format)
+//   - displayName: string (required)
+//   - role: string (required, 'client' | 'driver')
+//   - phone: string (optional)
+//   - location: string (optional)
+//   - vehicle: map (optional, for drivers)
+//     - model: string
+//     - plate: string
+//     - type: string ('economy' | 'premium' | 'luxury' | 'van')
+//   - isOnline: bool (optional)
+//   - rating: number (optional)
+//   - createdAt: timestamp (optional)
+//   - rideCountThisWeek: number (optional)
+//   - lastRideDate: timestamp (optional)
+//
+// Collection: rides
+// Document ID: {rideId}
+// Fields:
+//   - id: string (required)
+//   - clientId: string (required)
+//   - driverId: string (optional)
+//   - origin: string (required)
+//   - destination: string (required)
+//   - status: string (required, 'pending' | 'accepted' | 'completed' | 'cancelled')
+//   - fare: number (optional)
+//   - createdAt: timestamp (required)
+//
+// Collection: deliveries
+// Document ID: {deliveryId}
+// Fields:
+//   - id: string (required)
+//   - clientId: string (required)
+//   - driverId: string (optional)
+//   - origin: string (required)
+//   - destination: string (required)
+//   - status: string (required, 'pending' | 'accepted' | 'completed' | 'cancelled')
+//   - packageType: string (optional, 'small' | 'medium' | 'large' | 'fragile')
+//   - receiverName: string (optional)
+//   - receiverPhone: string (optional)
+//   - cost: number (optional)
+//   - createdAt: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "wydex83@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'displayName', 'role']) &&
+             (data.uid == request.auth.uid || isAdmin()) &&
+             (data.email == request.auth.token.email || !('email' in request.auth.token) || isAdmin()) &&
+             data.role in ['client', 'driver'] &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             (!('rideCountThisWeek' in data) || data.rideCountThisWeek is number) &&
+             (!('lastRideDate' in data) || data.lastRideDate is timestamp);
+    }
+
+    function isValidRide(data) {
+      return hasRequiredFields(['clientId', 'origin', 'destination', 'status', 'createdAt']) &&
+             data.clientId == request.auth.uid &&
+             data.status in ['pending', 'accepted', 'completed', 'cancelled'] &&
+             data.origin is string && data.origin.size() > 0 &&
+             data.destination is string && data.destination.size() > 0;
+    }
+
+    function isValidDelivery(data) {
+      return hasRequiredFields(['clientId', 'origin', 'destination', 'status', 'createdAt']) &&
+             data.clientId == request.auth.uid &&
+             data.status in ['pending', 'accepted', 'completed', 'cancelled'] &&
+             data.origin is string && data.origin.size() > 0 &&
+             data.destination is string && data.destination.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if (isOwner(userId) && isValidUser(request.resource.data)) || isAdmin();
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin();
+    }
+
+    match /rides/{rideId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.driverId || isAdmin());
+      allow create: if isAuthenticated() && isValidRide(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.clientId && isValidRide(request.resource.data)) ||
+        (request.auth.uid == request.resource.data.driverId && request.resource.data.status == 'accepted' && resource.data.status == 'pending') ||
+        (request.auth.uid == resource.data.driverId && isValidRide(request.resource.data)) ||
+        isAdmin()
+      );
+    }
+
+    match /deliveries/{deliveryId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.clientId || request.auth.uid == resource.data.driverId || isAdmin());
+      allow create: if isAuthenticated() && isValidDelivery(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.clientId && isValidDelivery(request.resource.data)) ||
+        (request.auth.uid == request.resource.data.driverId && request.resource.data.status == 'accepted' && resource.data.status == 'pending') ||
+        (request.auth.uid == resource.data.driverId && isValidDelivery(request.resource.data)) ||
+        isAdmin()
+      );
+    }
+  }
+}
